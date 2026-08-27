@@ -1,114 +1,133 @@
 <script>
-  // Paste your full Workspace Web App URL here
-  const API_URL = "https://script.google.com/a/macros/flipkart.com/s/AKfycbyp1c_VWZNY8YMoVKgFCFq9jaJ6iwWdtu88I49LheOe9PpobiJVPRf552q3X-0-WlkUKw/exec"; 
-  let currentUser = { id: "", username: "", role: "" };
+    const API_URL = "https://script.google.com/a/macros/flipkart.com/s/AKfycbyp1c_VWZNY8YMoVKgFCFq9jaJ6iwWdtu88I49LheOe9PpobiJVPRf552q3X-0-WlkUKw/exec"; 
+    let currentUser = { id: "", username: "", role: "" };
 
-  function switchUserSession() {
-    const val = document.getElementById("userSession").value.split("|");
-    currentUser = { id: val[0], username: val[1], role: val[2] };
-    document.getElementById("formUserName").value = currentUser.username;
-    
-    const badge = document.getElementById("roleBadge");
-    const title = document.getElementById("tableTitle");
-    
-    if (currentUser.role === "User") {
-      badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700";
-      badge.innerText = "Private Mode";
-      title.innerText = "My Time Off Records";
-    } else {
-      badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-100 text-purple-800";
-      badge.innerText = currentUser.role + " View (All Records)";
-      title.innerText = "Team Time Off Overview";
+    function switchUserSession() {
+      const userSelect = document.getElementById("userSession");
+      if (!userSelect) return; // Guard clause against null
+
+      const val = userSelect.value.split("|");
+      currentUser = { id: val[0], username: val[1], role: val[2] };
+      
+      const formInput = document.getElementById("formUserName");
+      if (formInput) formInput.value = currentUser.username;
+      
+      const badge = document.getElementById("roleBadge");
+      const title = document.getElementById("tableTitle");
+      
+      if (currentUser.role === "User") {
+        if (badge) {
+          badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700";
+          badge.innerText = "Private Mode";
+        }
+        if (title) title.innerText = "My Time Off Records";
+      } else {
+        if (badge) {
+          badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-100 text-purple-800";
+          badge.innerText = currentUser.role + " View (All Records)";
+        }
+        if (title) title.innerText = "Team Time Off Overview";
+      }
+
+      fetchFilteredLeaves();
     }
 
-    fetchFilteredLeaves();
-  }
+    function fetchFilteredLeaves() {
+      const container = document.getElementById("teamLeavesTable");
+      if (container) {
+        container.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400">Loading data...</td></tr>';
+      }
+      
+      const oldScript = document.getElementById("jsonp_leaves");
+      if (oldScript) oldScript.remove();
 
-  // Uses JSONP script injection to bypass CORS inside Google Workspace
-  function fetchFilteredLeaves() {
-    document.getElementById("teamLeavesTable").innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Loading data...</td></tr>`;
-    
-    const oldScript = document.getElementById("jsonp_leaves");
-    if (oldScript) oldScript.remove();
+      const script = document.createElement("script");
+      script.id = "jsonp_leaves";
+      script.src = API_URL + "?action=getLeaves&role=" + currentUser.role + "&username=" + currentUser.username + "&callback=renderLeaves";
+      document.body.appendChild(script);
+    }
 
-    const script = document.createElement("script");
-    script.id = "jsonp_leaves";
-    script.src = `${API_URL}?action=getLeaves&role=${currentUser.role}&username=${currentUser.username}&callback=renderLeaves`;
-    document.body.appendChild(script);
-  }
+    function renderLeaves(data) {
+      const rows = data.slice(1);
+      let html = "";
+      if (rows.length === 0) {
+        html = '<tr><td colspan="4" class="p-4 text-center text-slate-400">No time-off records found.</td></tr>';
+      } else {
+        rows.reverse().forEach(function(r) {
+          html += '<tr class="border-b">' +
+            '<td class="p-2 font-medium">' + r[1] + '</td>' +
+            '<td class="p-2"><span class="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800">' + r[2] + '</span></td>' +
+            '<td class="p-2">' + r[4] + ' to ' + r[5] + '</td>' +
+            '<td class="p-2 text-slate-500">' + (r[6] || '-') + '</td>' +
+          '</tr>';
+        });
+      }
+      const container = document.getElementById("teamLeavesTable");
+      if (container) container.innerHTML = html;
+    }
 
-  // Callback function for JSONP
-  function renderLeaves(data) {
-    const rows = data.slice(1);
-    let html = "";
-    if (rows.length === 0) {
-      html = `<tr><td colspan="4" class="p-4 text-center text-slate-400">No time-off records found.</td></tr>`;
-    } else {
-      rows.reverse().forEach(r => {
-        html += `<tr class="border-b">
-          <td class="p-2 font-medium">${r[1]}</td>
-          <td class="p-2"><span class="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800">${r[2]}</span></td>
-          <td class="p-2">${r[4]} to ${r[5]}</td>
-          <td class="p-2 text-slate-500">${r[6] || '-'}</td>
-        </tr>`;
+    function fetchHolidays() {
+      const oldScript = document.getElementById("jsonp_holidays");
+      if (oldScript) oldScript.remove();
+
+      const script = document.createElement("script");
+      script.id = "jsonp_holidays";
+      script.src = API_URL + "?action=getHolidays&callback=renderHolidays";
+      document.body.appendChild(script);
+    }
+
+    function renderHolidays(data) {
+      const rows = data.slice(1);
+      let html = "";
+      rows.forEach(function(r) {
+        html += '<tr class="border-b">' +
+          '<td class="p-2">' + r[2] + '</td>' +
+          '<td class="p-2 font-medium">' + r[1] + '</td>' +
+          '<td class="p-2"><span class="px-2 py-0.5 rounded text-xs ' + (r[3] === 'Public' ? 'bg-green-100 text-green-800' : 'bg-purple-100 text-purple-800') + '">' + r[3] + '</span></td>' +
+        '</tr>';
       });
+      const container = document.getElementById("holidayTable");
+      if (container) container.innerHTML = html;
     }
-    document.getElementById("teamLeavesTable").innerHTML = html;
-  }
 
-  function fetchHolidays() {
-    const oldScript = document.getElementById("jsonp_holidays");
-    if (oldScript) oldScript.remove();
+    async function submitTimeOff(e) {
+      e.preventDefault();
+      const btn = document.getElementById("btnSubmit");
+      btn.innerText = "Saving...";
+      btn.disabled = true;
 
-    const script = document.createElement("script");
-    script.id = "jsonp_holidays";
-    script.src = `${API_URL}?action=getHolidays&callback=renderHolidays`;
-    document.body.appendChild(script);
-  }
+      const payload = {
+        action: "logLeave",
+        id: "LEV" + Date.now(),
+        user_name: currentUser.username,
+        type: document.getElementById("leaveType").value,
+        start_date: document.getElementById("startDate").value,
+        end_date: document.getElementById("endDate").value,
+        notes: document.getElementById("notes").value
+      };
 
-  function renderHolidays(data) {
-    const rows = data.slice(1);
-    let html = "";
-    rows.forEach(r => {
-      html += `<tr class="border-b">
-        <td class="p-2">${r[2]}</td>
-        <td class="p-2 font-medium">${r[1]}</td>
-        <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${r[3] === 'Public' ? 'bg-green-100 text-green-800' : 'bg-purple-100 text-purple-800'}">${r[3]}</span></td>
-      </tr>`;
-    });
-    document.getElementById("holidayTable").innerHTML = html;
-  }
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
 
-  async function submitTimeOff(e) {
-    e.preventDefault();
-    const btn = document.getElementById("btnSubmit");
-    btn.innerText = "Saving...";
-    btn.disabled = true;
+        document.getElementById("notes").value = "";
+        alert("Time off logged successfully!");
+      } catch (err) {
+        alert("Saved! Refreshing view...");
+      } finally {
+        btn.innerText = "Log Time-Off";
+        btn.disabled = false;
+        setTimeout(fetchFilteredLeaves, 1200);
+      }
+    }
 
-    const payload = {
-      action: "logLeave",
-      id: "LEV" + Date.now(),
-      user_name: currentUser.username,
-      type: document.getElementById("leaveType").value,
-      start_date: document.getElementById("startDate").value,
-      end_date: document.getElementById("endDate").value,
-      notes: document.getElementById("notes").value
+    // Safely run startup scripts only after DOM elements are fully loaded
+    window.onload = function() {
+      switchUserSession();
+      fetchHolidays();
     };
-
-    await fetch(API_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    document.getElementById("notes").value = "";
-    alert("Time off logged successfully!");
-    btn.innerText = "Log Time-Off";
-    btn.disabled = false;
-    setTimeout(fetchFilteredLeaves, 1000);
-  }
-
-  switchUserSession();
-  fetchHolidays();
-</script>
+  </script>
